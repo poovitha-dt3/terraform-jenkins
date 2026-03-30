@@ -1,6 +1,11 @@
 pipeline {
     agent any
 
+    environment {
+        AWS_DEFAULT_REGION = 'us-east-2'
+        PATH = "/usr/local/bin:${env.PATH}"
+    }
+
     stages {
 
         stage('Checkout') {
@@ -11,19 +16,74 @@ pipeline {
 
         stage('Terraform Init') {
             steps {
-                sh 'terraform init'
+                withCredentials([usernamePassword(
+                    credentialsId: 'aws-creds',
+                    usernameVariable: 'AWS_ACCESS_KEY_ID',
+                    passwordVariable: 'AWS_SECRET_ACCESS_KEY'
+                )]) {
+                    sh '''
+                        echo "=== INIT STAGE ==="
+                        env | grep AWS || true
+
+                        export AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+                        export AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+                        export AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION}
+
+                        terraform init
+                    '''
+                }
             }
         }
 
         stage('Terraform Validate') {
             steps {
-                sh 'terraform validate'
+                sh '''
+                    echo "=== VALIDATE STAGE ==="
+                    terraform validate
+                '''
             }
         }
 
         stage('Terraform Plan') {
             steps {
-                sh 'terraform plan'
+                withCredentials([usernamePassword(
+                    credentialsId: 'aws-creds',
+                    usernameVariable: 'AWS_ACCESS_KEY_ID',
+                    passwordVariable: 'AWS_SECRET_ACCESS_KEY'
+                )]) {
+                    sh '''
+                        echo "=== PLAN STAGE ==="
+                        env | grep AWS || true
+
+                        export AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+                        export AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+                        export AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION}
+
+                        terraform plan
+                    '''
+                }
+            }
+        }
+
+        stage('Terraform Apply') {
+            steps {
+                input message: "Do you want to apply Terraform changes?"
+
+                withCredentials([usernamePassword(
+                    credentialsId: 'aws-creds',
+                    usernameVariable: 'AWS_ACCESS_KEY_ID',
+                    passwordVariable: 'AWS_SECRET_ACCESS_KEY'
+                )]) {
+                    sh '''
+                        echo "=== APPLY STAGE ==="
+
+                        export AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+                        export AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+                        export AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION}
+
+                        terraform apply -auto-approve
+                    '''
+                }
             }
         }
     }
