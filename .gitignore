@@ -1,0 +1,7 @@
+./terraform
+.terraform
+
+# avoid tracking terraform state
+*.tfstate
+*.tfstate.backup
+.terraform/
